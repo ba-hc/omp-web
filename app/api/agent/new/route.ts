@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import type { ThinkingLevel } from "@oh-my-pi/pi-agent-core";
-import { parseThinkingLevel as parseOmpThinkingLevel } from "@oh-my-pi/pi-coding-agent/thinking";
+import { parseConfiguredThinkingLevel as parseOmpThinkingLevel, type ConfiguredThinkingLevel } from "@oh-my-pi/pi-coding-agent/thinking";
 import { existsSync } from "fs";
 import { randomUUID } from "crypto";
 import { allowFileRoot, getAllowedFileRoots, isExistingFilePathAllowed } from "@/lib/file-access";
@@ -9,7 +8,7 @@ import { startRpcSession } from "@/lib/rpc-manager";
 import { hasJsonContentType, isApiRequestAllowed } from "@/lib/request-security";
 // omp owns the selector grammar (including abbreviations like "med"); reuse its
 // parser so the browser and the CLI accept exactly the same values.
-function parseThinkingLevel(value: unknown): ThinkingLevel | undefined {
+function parseThinkingLevel(value: unknown): ConfiguredThinkingLevel | undefined {
   if (value === undefined) return undefined;
   const parsed = typeof value === "string" ? parseOmpThinkingLevel(value) : undefined;
   if (parsed === undefined) throw new Error(`Invalid thinking level: ${String(value)}`);
@@ -81,6 +80,7 @@ export async function POST(req: Request) {
     const state = await session.send({ type: "get_state" }) as {
       model?: { id: string; provider: string };
       thinkingLevel?: string;
+      configuredThinkingLevel?: string;
     };
 
     if (promptCommand.type === "ensure_session") {
@@ -92,6 +92,7 @@ export async function POST(req: Request) {
           ? { provider: state.model.provider, modelId: state.model.id }
           : null,
         thinkingLevel: state.thinkingLevel,
+        configuredThinkingLevel: state.configuredThinkingLevel,
       });
     }
 
@@ -106,6 +107,7 @@ export async function POST(req: Request) {
         ? { provider: state.model.provider, modelId: state.model.id }
         : null,
       thinkingLevel: state.thinkingLevel,
+      configuredThinkingLevel: state.configuredThinkingLevel,
     });
   } catch (error) {
     return NextResponse.json({

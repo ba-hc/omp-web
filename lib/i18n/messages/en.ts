@@ -302,7 +302,7 @@ export const enLocale: LocalePlugin = {
     "chat.stop": "Stop",
     "chat.disableSound": "Disable completion sound",
     "chat.enableSound": "Enable completion sound",
-    "chat.thinkingUseDefault": "Use omp default",
+    "chat.thinkingAuto": "Automatically select reasoning effort",
     "chat.thinkingOff": "Reasoning off",
     "chat.thinkingMinimal": "Minimal reasoning",
     "chat.thinkingLow": "Low reasoning",
