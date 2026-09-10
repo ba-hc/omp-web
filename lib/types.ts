@@ -416,5 +416,6 @@ export interface SessionContext {
   messages: AgentMessage[];
   entryIds: string[]; // parallel to messages — the session entry id for each message
   thinkingLevel: string;
+  configuredThinkingLevel: string;
   model: { provider: string; modelId: string } | null;
 }

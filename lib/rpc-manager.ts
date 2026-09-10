@@ -1,4 +1,4 @@
-import type { ThinkingLevel } from "@oh-my-pi/pi-agent-core";
+import type { ConfiguredThinkingLevel } from "@oh-my-pi/pi-coding-agent/thinking";
 import {
   applyResolvedSystemPromptInputs,
   createAgentSession,
@@ -140,7 +140,7 @@ export function resolveForkEntryId(
 export interface RpcSessionStartOptions {
   toolNames?: string[];
   initialModel?: { provider: string; modelId: string };
-  thinkingLevel?: ThinkingLevel;
+  thinkingLevel?: ConfiguredThinkingLevel;
 }
 
 const CODING_TOOL_NAMES: Record<string, true> = Object.fromEntries(
@@ -840,6 +840,7 @@ export class AgentSessionWrapper {
             : null,
           systemPrompt: [this.inner.agent.state?.systemPrompt ?? ""].flat().join("\n"),
           thinkingLevel: this.inner.agent.state?.thinkingLevel ?? "off",
+          configuredThinkingLevel: this.inner.configuredThinkingLevel() ?? "off",
           extensionStatuses: this.getExtensionStatuses(),
           extensionWidgets: this.getExtensionWidgets(),
           subagents: this.getSubagentSnapshots(),

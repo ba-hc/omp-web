@@ -131,6 +131,8 @@ Two places surface them:
 
 Session titles follow the same routing: omp-web asks omp to name a session, and omp resolves that through the `tiny` → `commit` → `smol` chain rather than the session's primary model.
 
+The reasoning selector supports **Auto**, which lets omp select effort for each turn. The selector keeps Auto selected across reloads and shows the resolved effort separately, for example `auto (high)`. Selecting Auto explicitly also carries that preference into a new session.
+
 ## HTTP Proxy
 
 omp-web reads the standard `HTTP_PROXY` and `HTTPS_PROXY` environment variables for server-side model and API requests. Bun reads them once at process start, so set them before launching:

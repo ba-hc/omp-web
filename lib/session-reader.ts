@@ -340,6 +340,7 @@ export function buildSessionContext(
     messages,
     entryIds,
     thinkingLevel: ompCtx.thinkingLevel ?? "off",
+    configuredThinkingLevel: ompCtx.configuredThinkingLevel ?? ompCtx.thinkingLevel ?? "off",
     model: parseDefaultModel(ompCtx.models),
   };
 }

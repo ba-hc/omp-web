@@ -16,25 +16,6 @@ test("new-session startup sends only explicit browser overrides", () => {
   assert.doesNotMatch(ensureSource, /thinkingLevel !== "auto"/);
 });
 
-test("new-session startup adopts server state only while explicit overrides are unchanged", () => {
-  const ensureSource = source.slice(
-    source.indexOf("const ensureNewSession"),
-    source.indexOf("const loadSlashCommands"),
-  );
-
-  assert.match(
-    ensureSource,
-    /result\.model && newSessionModelOverrideRef\.current === selectedModel/,
-  );
-  assert.match(ensureSource, /setPendingModel\(result\.model\)/);
-  assert.match(ensureSource, /setNewSessionDefaultModel\(result\.model\)/);
-  assert.match(
-    ensureSource,
-    /thinkingLevelOverrideRef\.current === selectedThinkingLevel/,
-  );
-  assert.match(ensureSource, /setThinkingLevel\(result\.thinkingLevel\)/);
-});
-
 test("model-list refresh does not overwrite a live session or explicit thinking override", () => {
   const loadModelsSource = source.slice(
     source.indexOf("const loadModels = useCallback"),

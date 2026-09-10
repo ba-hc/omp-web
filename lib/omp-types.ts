@@ -187,6 +187,7 @@ export interface AgentSessionLike {
    */
   handoff(customInstructions?: string): Promise<{ document: string; savedPath?: string } | undefined>;
   setThinkingLevel(level: string | undefined, persist?: boolean): void;
+  configuredThinkingLevel(): string | undefined;
   compact(customInstructions?: string): Promise<unknown>;
   getSessionStats(): Omit<SessionStatsInfo, "sessionName">;
   getLastAssistantText(): string | undefined;
