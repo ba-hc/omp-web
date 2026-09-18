@@ -174,8 +174,9 @@ record; `GET /api/models` ships the resolved table so `ChatInput` can list roles
 above the flat model list, and `set_role_model` switches the session **and
 records the role** so the transcript matches what `/model` writes in the TUI.
 
-An explicit model pick in the browser is persisted as `modelRoles.default`
-(`lib/startup-preferences.ts`), which is the same slot the TUI writes.
+An explicit model pick for a new browser session remains session-scoped. Only
+the model-roles UI/API persists `modelRoles` assignments; the thinking selector
+may still persist `defaultThinkingLevel` through `lib/startup-preferences.ts`.
 
 ### Fork must destroy the wrapper immediately
 `AgentSession.fork()` **mutates the wrapper's inner state in-place** — after fork, `inner.sessionId` is the *new* session's id. If the wrapper stays alive in the registry under the old id, the next request gets the already-forked state and subsequent forks produce a corrupt `parentSession` chain.

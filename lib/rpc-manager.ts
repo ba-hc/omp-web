@@ -46,6 +46,12 @@ import type {
   SubagentSnapshot,
 } from "./types";
 import { createHeadlessCustomUiTui, DEFAULT_CUSTOM_UI_COLUMNS } from "./custom-ui-terminal";
+import {
+  createWorkspaceContext,
+  decorateModelWithWorkspaceContext,
+  modelWithWorkspaceContext,
+  type WorkspaceContext,
+} from "./workspace-context";
 
 // ============================================================================
 // Types
@@ -286,6 +292,7 @@ export class AgentSessionWrapper {
   private onDestroyCallback: (() => void) | null = null;
   private shutdownPromise: Promise<void> | null = null;
   private readonly subagents: RpcSubagentRegistry;
+  private readonly workspaceContext?: WorkspaceContext;
   // The SDK registry removes terminal entries after emitting their lifecycle frame.
   // Keep a bounded per-session copy so state requests can still expose history.
   private readonly subagentHistory = new Map<string, SubagentSnapshot>();
@@ -295,7 +302,9 @@ export class AgentSessionWrapper {
   constructor(
     public readonly inner: AgentSessionLike,
     eventBus: ConstructorParameters<typeof RpcSubagentRegistry>[0],
+    workspaceContext?: WorkspaceContext,
   ) {
+    this.workspaceContext = workspaceContext;
     this.subagents = new RpcSubagentRegistry(eventBus, (frame) => {
       const event = frame as unknown as AgentEvent;
       this.rememberSubagentFrame(event);
@@ -404,6 +413,7 @@ export class AgentSessionWrapper {
   }
 
   isRunning(): boolean {
+    const asyncJobs = this.inner.getAsyncJobSnapshot?.({ recentLimit: 0 });
     return this._alive && (
       this.promptRunning
       || this.handoffRunning
@@ -411,6 +421,10 @@ export class AgentSessionWrapper {
       || this.inner.isCompacting
       || this.inner.isBashRunning
       || this.subagents.getSubagents().length > 0
+      || this.inner.hasPendingAsyncWork?.() === true
+      || (asyncJobs?.running.length ?? 0) > 0
+      || (asyncJobs?.delivery.queued ?? 0) > 0
+      || asyncJobs?.delivery.delivering === true
     );
   }
   bindToolUiContext(setter: (uiContext: ExtensionUiContextLike, hasUI: boolean) => void): void {
@@ -844,6 +858,8 @@ export class AgentSessionWrapper {
           extensionStatuses: this.getExtensionStatuses(),
           extensionWidgets: this.getExtensionWidgets(),
           subagents: this.getSubagentSnapshots(),
+          asyncJobs: this.inner.getAsyncJobSnapshot?.({ recentLimit: 32 }) ?? null,
+          ...(this.workspaceContext ? { workspaceContext: this.workspaceContext } : {}),
           goal: this.goalMode.getStatus(),
         };
       }
@@ -874,7 +890,10 @@ export class AgentSessionWrapper {
         if (!model) throw new Error(`Model not found: ${provider}/${modelId}`);
         // omp records the role a model change came from, so the transcript and
         // the `/model` carousel agree on which role is currently driving.
-        await this.inner.setModel(model, role);
+        await this.inner.setModel(
+          this.workspaceContext ? modelWithWorkspaceContext(model, this.workspaceContext) : model,
+          role,
+        );
         invalidateModelsCache();
         invalidateSessionListCache();
         return { id: model.id, provider: model.provider, ...(role ? { role } : {}) };
@@ -884,7 +903,10 @@ export class AgentSessionWrapper {
         const role = command.role as string;
         const model = this.inner.resolveRoleModel(role);
         if (!model) throw new Error(`No model configured for role "${role}"`);
-        await this.inner.setModel(model, role);
+        await this.inner.setModel(
+          this.workspaceContext ? modelWithWorkspaceContext(model, this.workspaceContext) : model,
+          role,
+        );
         invalidateModelsCache();
         invalidateSessionListCache();
         return { id: model.id, provider: model.provider, role };
@@ -1748,6 +1770,7 @@ export async function startRpcSession(
         return SessionManager.create(cwd, undefined);
       })();
     const sessionCwd = sessionManager.getCwd();
+    const workspaceContext = await createWorkspaceContext(sessionCwd, { taskId: sessionManager.getSessionId() });
     const finishStartingSession = trackStartingSession(sessionCwd);
 
     try {
@@ -1799,7 +1822,7 @@ export async function startRpcSession(
         sessionManager,
         modelRegistry,
         hasUI: true,
-        ...(initial.model ? { model: initial.model } : {}),
+        ...(initial.model ? { model: modelWithWorkspaceContext(initial.model, workspaceContext) } : {}),
         ...(initial.thinkingLevel ? { thinkingLevel: initial.thinkingLevel } : {}),
         ...(initial.scopedModels.length > 0 ? { scopedModels: initial.scopedModels } : {}),
         ...(toolsOption !== undefined ? { toolNames: toolsOption, restrictToolNames: true } : {}),
@@ -1809,22 +1832,18 @@ export async function startRpcSession(
       // CLI renders it with instead of overwriting the whole system prompt.
       applyResolvedSystemPromptInputs(sessionOptions, systemPrompts.systemPrompt, systemPrompts.appendPrompt);
       const { session: inner, eventBus, setToolUIContext } = await createAgentSession(sessionOptions);
+      decorateModelWithWorkspaceContext(inner.model, workspaceContext);
 
-      const persistedPreferences = await persistExplicitStartupPreferences(
+      await persistExplicitStartupPreferences(
         runtime.settings,
         {
-          ...(initialModel ? { model: initialModel } : {}),
           ...(thinkingLevel ? { thinkingLevel } : {}),
         },
         {
-          ...(inner.model
-            ? { model: { provider: inner.model.provider, modelId: inner.model.id } }
-            : {}),
           thinkingLevel: inner.thinkingLevel ?? "off",
           supportsThinking: Boolean(inner.model?.reasoning),
         },
       );
-      if (persistedPreferences.modelDefaultChanged) invalidateModelsCache();
 
       const session = inner as unknown as AgentSessionLike;
 
@@ -1835,7 +1854,7 @@ export async function startRpcSession(
         await session.setActiveToolsByName(withExtensionTools(session, toolNames));
       }
 
-      const wrapper = new AgentSessionWrapper(session, eventBus);
+      const wrapper = new AgentSessionWrapper(session, eventBus, workspaceContext);
       wrapper.bindToolUiContext(
         setToolUIContext as unknown as (uiContext: ExtensionUiContextLike, hasUI: boolean) => void,
       );

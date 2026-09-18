@@ -1,0 +1,28 @@
+diff --git a/src/session/settings-stream-fn.ts b/src/session/settings-stream-fn.ts
+index 1e6c7c5efc5c46aa5bdc06f065365b75ec7fa670..b21bfbba7ea235b245f3639db2a582a3906a8351 100644
+--- a/src/session/settings-stream-fn.ts
++++ b/src/session/settings-stream-fn.ts
+@@ -66,6 +66,14 @@ export function createSettingsAwareStreamFn(settings: Settings, base: StreamFn =
+ 			(serverSideFallbackIdentity.family === "fable" || serverSideFallbackIdentity.family === "mythos");
+ 		const fallbacks =
+ 			streamOptions?.fallbacks ?? (serverSideFallbackEnabled ? [{ model: "claude-opus-4-8" }] : undefined);
++		const isOmpBridge = model.provider === "chatgpt-web";
++		// The configured `!pwd` header is evaluated once when models.yml loads. Use
++		// the live session cwd for every bridge request so `/move` cannot leak the
++		// previous workspace, and avoid pooled WebSockets whose handshake headers
++		// would otherwise remain scoped to the first workspace.
++		const headers = isOmpBridge && streamOptions?.cwd
++			? { ...streamOptions.headers, "x-omp-workspace-root": streamOptions.cwd }
++			: streamOptions?.headers;
+ 		const merged: SimpleStreamOptions = {
+ 			...streamOptions,
+ 			openrouterVariant: streamOptions?.openrouterVariant ?? openrouterVariant,
+@@ -75,6 +83,8 @@ export function createSettingsAwareStreamFn(settings: Settings, base: StreamFn =
+ 			streamFirstEventTimeoutMs: streamOptions?.streamFirstEventTimeoutMs ?? streamFirstEventTimeoutMs,
+ 			streamIdleTimeoutMs: streamOptions?.streamIdleTimeoutMs ?? streamIdleTimeoutMs,
+ 			maxRetryDelayMs: streamOptions?.maxRetryDelayMs ?? settings.get("retry.maxDelayMs"),
++			...(headers !== undefined ? { headers } : {}),
++			...(isOmpBridge ? { preferWebsockets: false } : {}),
+ 			maxInFlightRequests: validateProviderMaxInFlightRequests(
+ 				streamOptions?.maxInFlightRequests ?? settings.get("providers.maxInFlightRequests"),
+ 			),

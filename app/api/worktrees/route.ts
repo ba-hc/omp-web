@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { existsSync } from "fs";
 import { addWorktree, listWorktrees, removeWorktree, resolveProject } from "@/lib/worktree";
+import { preflightBranchOperation } from "@/lib/branch-preflight";
 import { allowFileRoot, getAllowedFileRoots, isExistingFilePathAllowed, isFilePathAllowed } from "@/lib/file-access";
 import { hasJsonContentType, isApiRequestAllowed } from "@/lib/request-security";
 
@@ -63,7 +64,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const body = await req.json() as { cwd?: string; branch?: string };
+    const body = await req.json() as { cwd?: string; branch?: string; stackOnCurrent?: boolean };
     if (!body.cwd || typeof body.cwd !== "string") {
       return NextResponse.json({ error: "cwd is required" }, { status: 400 });
     }
@@ -76,8 +77,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: `Directory does not exist: ${body.cwd}` }, { status: 400 });
     }
 
-    const result = await addWorktree(body.cwd, body.branch);
-    return NextResponse.json(result);
+    const preflight = await preflightBranchOperation(body.cwd, body.branch, { stackOnCurrent: body.stackOnCurrent });
+    if (preflight.requiresExplicitStack && !preflight.stackOnCurrent) {
+      return NextResponse.json({
+        error: `Refusing to stack ${preflight.branch} on feature branch ${preflight.baseline.branch}; confirm stackOnCurrent=true to continue`,
+        code: "branch_stacking_requires_confirmation",
+        preflight,
+      }, { status: 409 });
+    }
+    const result = await addWorktree(body.cwd, preflight.branch);
+    return NextResponse.json({ ...result, baseline: preflight.baseline });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return NextResponse.json({ error: message }, { status: 400 });

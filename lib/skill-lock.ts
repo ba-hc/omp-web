@@ -28,10 +28,11 @@ interface AnnotateSkillOptions {
   projectLockPath?: string;
 }
 
-export function getGlobalSkillsLockPath({
-  homeDir = homedir(),
-  xdgStateHome = process.env.XDG_STATE_HOME,
-}: GlobalLockPathOptions = {}): string {
+export function getGlobalSkillsLockPath(options: GlobalLockPathOptions = {}): string {
+  const homeDir = options.homeDir ?? homedir();
+  const xdgStateHome = Object.hasOwn(options, "xdgStateHome")
+    ? options.xdgStateHome
+    : process.env.XDG_STATE_HOME;
   return xdgStateHome
     ? join(xdgStateHome, "skills", ".skill-lock.json")
     : join(homeDir, ".agents", ".skill-lock.json");

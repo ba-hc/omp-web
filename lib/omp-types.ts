@@ -82,6 +82,17 @@ interface SkillLike {
   filePath?: string;
 }
 
+export interface AsyncJobSnapshotLike {
+  running: readonly Record<string, unknown>[];
+  recent: readonly Record<string, unknown>[];
+  delivery: {
+    queued: number;
+    delivering: boolean;
+    nextRetryAt?: number;
+    pendingJobIds: readonly string[];
+  };
+}
+
 interface ExtensionRunnerLike {
   getRegisteredCommands(reserved?: ReadonlySet<string>): Array<{
     name: string;
@@ -204,6 +215,9 @@ export interface AgentSessionLike {
   getEnabledToolNames(): string[];
   setActiveToolsByName(names: string[]): Promise<void>;
   abortCompaction(): void;
+  /** SDK-owned async work, including pending result delivery that can wake the session. */
+  getAsyncJobSnapshot?(options?: { recentLimit?: number }): AsyncJobSnapshotLike | null;
+  hasPendingAsyncWork?(): boolean;
   getPlanModeState?(): {
     enabled: boolean;
     planFilePath: string;
